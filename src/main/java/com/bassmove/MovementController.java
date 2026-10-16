@@ -25,7 +25,7 @@ public final class MovementController {
 
 	/** Call once per client tick, before the player ticks. */
 	public void tick(Minecraft mc, boolean active, int pitchClass) {
-		if (!active || mc.player == null || mc.screen != null) {
+		if (!active || mc.player == null || mc.gui.screen() != null) {
 			releaseAll();
 			return;
 		}
