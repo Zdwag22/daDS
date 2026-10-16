@@ -1,7 +1,7 @@
 plugins {
 	// Non-remapping Loom: Minecraft 26.x is unobfuscated, so plain
 	// "implementation" is used instead of "modImplementation".
-	id 'net.fabricmc.fabric-loom' version "${project.loom_version}"
+	id 'net.fabricmc.fabric-loom' version '1.17-SNAPSHOT'
 	id 'maven-publish'
 }
 
