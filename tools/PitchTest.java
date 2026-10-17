@@ -8,6 +8,10 @@ public class PitchTest {
 	static final Random RNG = new Random(42);
 	static int failures = 0;
 
+	static double hzOf(int midi) {
+		return 440.0 * Math.pow(2, (midi - 69) / 12.0);
+	}
+
 	/** Bass-like tone: weak fundamental, strong 2nd harmonic, decaying, plus noise. */
 	static float[] tone(double hz, double seconds, double amp, double noise) {
 		int n = (int) (seconds * SR);
@@ -47,43 +51,53 @@ public class PitchTest {
 	}
 
 	public static void main(String[] args) {
-		Object[][] notes = {
-			{"B0 (5-string low B)", 30.87, 11}, {"E1 (open E)", 41.20, 4}, {"F1", 43.65, 5},
-			{"A1 (open A)", 55.00, 9}, {"D2 (open D)", 73.42, 2}, {"G2 (open G)", 98.00, 7},
-			{"C3", 130.81, 0}, {"E3", 164.81, 4}, {"G4 (24th fret G)", 392.00, 7},
+		// Name parsing / formatting
+		check("midiOf(E1) == 28", NoteTracker.midiOf("E1") == 28, "got " + NoteTracker.midiOf("E1"));
+		check("midiOf(F#1) == 30", NoteTracker.midiOf("F#1") == 30, "got " + NoteTracker.midiOf("F#1"));
+		check("nameOf(43) == G2", NoteTracker.nameOf(43).equals("G2"), NoteTracker.nameOf(43));
+		check("midiOf(E) rejected", NoteTracker.midiOf("E") == -1, "got " + NoteTracker.midiOf("E"));
+
+		// Every note in the default layout: open strings, 1st fret, 2nd fret of a 4-string bass.
+		String[] layout = {
+			"E1", "A1", "D2", "G2",     // open
+			"F1", "A#1", "D#2", "G#2",  // 1st fret
+			"F#1", "B1", "E2", "A2",    // 2nd fret
 		};
-		for (Object[] n : notes) {
+		for (String name : layout) {
+			int midi = NoteTracker.midiOf(name);
 			BassAnalyzer a = newAnalyzer();
-			feed(a, tone((double) n[1], 0.6, 0.35, 0.004));
-			int pc = a.pitchClass();
-			check((String) n[0], pc == (int) n[2],
-				String.format("expected %s, got %s (%.2f Hz detected)", NoteTracker.nameOf((int) n[2]), NoteTracker.nameOf(pc), a.lastHz()));
+			feed(a, tone(hzOf(midi), 0.6, 0.35, 0.004));
+			check("Note " + name, a.midiNote() == midi,
+				String.format("expected %s, got %s (%.2f Hz)", name, NoteTracker.nameOf(a.midiNote()), a.lastHz()));
 		}
 
-		// Detune check: the same E, 20 cents flat and sharp, should still read as E.
+		// Each fret on the same string must be told apart (semitone neighbours), 20 cents flat/sharp too.
 		for (double cents : new double[] {-20, 20}) {
-			BassAnalyzer a = newAnalyzer();
-			feed(a, tone(41.20 * Math.pow(2, cents / 1200), 0.6, 0.35, 0.004));
-			check("E1 detuned " + (int) cents + " cents", a.pitchClass() == 4, "got " + NoteTracker.nameOf(a.pitchClass()));
+			for (String name : new String[] {"E1", "F1", "F#1"}) {
+				int midi = NoteTracker.midiOf(name);
+				BassAnalyzer a = newAnalyzer();
+				feed(a, tone(hzOf(midi) * Math.pow(2, cents / 1200), 0.6, 0.35, 0.004));
+				check(name + " detuned " + (int) cents + " cents", a.midiNote() == midi, "got " + NoteTracker.nameOf(a.midiNote()));
+			}
 		}
 
 		// Room noise alone must not trigger anything.
 		BassAnalyzer quiet = newAnalyzer();
 		feed(quiet, silence(1.0, 0.004));
-		check("Room noise ignored", quiet.pitchClass() == -1, "pitch class " + quiet.pitchClass());
+		check("Room noise ignored", quiet.midiNote() == -1, "note " + quiet.midiNote());
 
-		// Sequence: E -> A -> silence -> D, checked at the end of each segment.
+		// Sequence: open E -> E 1st fret -> E 2nd fret -> rest -> open A.
 		BassAnalyzer seq = newAnalyzer();
-		feed(seq, tone(41.20, 0.5, 0.35, 0.004));
-		int first = seq.pitchClass();
-		feed(seq, tone(55.00, 0.5, 0.35, 0.004));
-		int second = seq.pitchClass();
-		feed(seq, silence(0.5, 0.004));
-		int third = seq.pitchClass();
-		feed(seq, tone(73.42, 0.5, 0.35, 0.004));
-		int fourth = seq.pitchClass();
-		check("Sequence E,A,rest,D", first == 4 && second == 9 && third == -1 && fourth == 2,
-			String.format("%s %s %s %s", NoteTracker.nameOf(first), NoteTracker.nameOf(second), NoteTracker.nameOf(third), NoteTracker.nameOf(fourth)));
+		int[] expect = {28, 29, 30, -1, 33};
+		double[] hz = {hzOf(28), hzOf(29), hzOf(30), 0, hzOf(33)};
+		StringBuilder got = new StringBuilder();
+		boolean ok = true;
+		for (int i = 0; i < expect.length; i++) {
+			feed(seq, hz[i] > 0 ? tone(hz[i], 0.5, 0.35, 0.004) : silence(0.5, 0.004));
+			ok &= seq.midiNote() == expect[i];
+			got.append(NoteTracker.nameOf(seq.midiNote())).append(' ');
+		}
+		check("Sequence E1 F1 F#1 rest A1", ok, got.toString().trim());
 
 		System.out.println(failures == 0 ? "\nAll checks passed." : "\n" + failures + " check(s) FAILED.");
 		System.exit(failures == 0 ? 0 : 1);

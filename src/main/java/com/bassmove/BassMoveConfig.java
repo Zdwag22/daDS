@@ -5,27 +5,36 @@ import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /** Settings loaded from config/bassmove.properties (written with defaults on first run). */
 public final class BassMoveConfig {
-	/** Default note -> action mapping, indexed C, C#, D, D#, E, F, F#, G, G#, A, A#, B. */
-	private static final MovementAction[] DEFAULT_ACTIONS = {
-		MovementAction.LEFT,           // C
-		MovementAction.TURN_LEFT,      // C#
-		MovementAction.BACK,           // D
-		MovementAction.SNEAK,          // D#
-		MovementAction.FORWARD,        // E
-		MovementAction.JUMP,           // F
-		MovementAction.LOOK_UP,        // F#
-		MovementAction.RIGHT,          // G
-		MovementAction.TURN_RIGHT,     // G#
-		MovementAction.SPRINT_FORWARD, // A
-		MovementAction.LOOK_DOWN,      // A#
-		MovementAction.NONE,           // B
+	/**
+	 * Default layout for a 4-string bass in standard tuning (E A D G).
+	 * Open strings = move, 1st fret = look, 2nd fret = jump / break / place.
+	 * Notes are exact (octave included), so the same note higher up the neck does nothing.
+	 */
+	private static final String[][] DEFAULTS = {
+		// open strings: movement (E = forward, A = left, D = back, G = right)
+		{"E1", "FORWARD"},
+		{"A1", "LEFT"},
+		{"D2", "BACK"},
+		{"G2", "RIGHT"},
+		// 1st fret: looking (same order: up, left, down, right)
+		{"F1", "LOOK_UP"},
+		{"A#1", "TURN_LEFT"},
+		{"D#2", "LOOK_DOWN"},
+		{"G#2", "TURN_RIGHT"},
+		// 2nd fret: actions
+		{"F#1", "JUMP"},
+		{"B1", "ATTACK"},
+		{"E2", "JUMP_FORWARD"},
+		{"A2", "USE"},
 	};
 
-	public final MovementAction[] actions = DEFAULT_ACTIONS.clone();
+	private final Map<Integer, MovementAction> actions = new HashMap<>();
 	public String device = "";
 	public float noiseGate = 0.02f;
 	public float yinThreshold = 0.15f;
@@ -35,6 +44,16 @@ public final class BassMoveConfig {
 	public float maxHz = 420f;
 	public float turnDegreesPerTick = 4f;
 	public boolean debug = false;
+
+	public BassMoveConfig() {
+		for (String[] entry : DEFAULTS) {
+			actions.put(NoteTracker.midiOf(entry[0]), MovementAction.parse(entry[1], MovementAction.NONE));
+		}
+	}
+
+	public MovementAction actionFor(int midiNote) {
+		return actions.getOrDefault(midiNote, MovementAction.NONE);
+	}
 
 	public static BassMoveConfig load(Path file) {
 		BassMoveConfig config = new BassMoveConfig();
@@ -57,9 +76,22 @@ public final class BassMoveConfig {
 		config.maxHz = parseFloat(props, "maxHz", config.maxHz);
 		config.turnDegreesPerTick = parseFloat(props, "turnDegreesPerTick", config.turnDegreesPerTick);
 		config.debug = Boolean.parseBoolean(props.getProperty("debug", "false").trim());
-		for (int i = 0; i < 12; i++) {
-			config.actions[i] = MovementAction.parse(
-					props.getProperty("note." + NoteTracker.NOTE_NAMES[i]), DEFAULT_ACTIONS[i]);
+
+		boolean sawNoteKeys = false;
+		for (String key : props.stringPropertyNames()) {
+			if (!key.startsWith("note.")) {
+				continue;
+			}
+			int midi = NoteTracker.midiOf(key.substring(5));
+			if (midi < 0) {
+				continue; // e.g. an old-style "note.E" key without an octave
+			}
+			if (!sawNoteKeys) {
+				// The file has its own note list, so it replaces the defaults.
+				config.actions.clear();
+				sawNoteKeys = true;
+			}
+			config.actions.put(midi, MovementAction.parse(props.getProperty(key), MovementAction.NONE));
 		}
 		return config;
 	}
@@ -93,10 +125,11 @@ public final class BassMoveConfig {
 		sb.append("turnDegreesPerTick=").append(turnDegreesPerTick).append("\n\n");
 		sb.append("# Log every note change plus the signal level.\n");
 		sb.append("debug=false\n\n");
-		sb.append("# Note -> action. Any octave of the note triggers it.\n");
+		sb.append("# Exact note (with octave) -> action. Notes not listed here do nothing.\n");
+		sb.append("# 4-string bass, standard tuning: open strings are E1 A1 D2 G2.\n");
 		sb.append("# Actions: ").append(String.join(", ", actionNames())).append("\n");
-		for (int i = 0; i < 12; i++) {
-			sb.append("note.").append(NoteTracker.NOTE_NAMES[i]).append('=').append(actions[i]).append('\n');
+		for (String[] entry : DEFAULTS) {
+			sb.append("note.").append(entry[0]).append('=').append(entry[1]).append('\n');
 		}
 		try {
 			Files.createDirectories(file.getParent());

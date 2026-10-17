@@ -23,7 +23,7 @@ public final class BassAnalyzer {
 	private int decimCount = 0;
 	private float decimAccumulator = 0f;
 
-	private volatile int pitchClass = -1;
+	private volatile int midiNote = -1;
 	private volatile float lastHz = -1f;
 	private volatile float lastRms = 0f;
 
@@ -81,12 +81,12 @@ public final class BassAnalyzer {
 
 		float hz = rms < gate ? -1f : yin.detect(work);
 		lastHz = hz;
-		pitchClass = tracker.update(hz);
+		midiNote = tracker.update(hz);
 	}
 
-	/** Current stable pitch class (0 = C ... 11 = B), or -1 when nothing is being played. */
-	public int pitchClass() {
-		return pitchClass;
+	/** Current stable MIDI note (E1 = 28), or -1 when nothing is being played. */
+	public int midiNote() {
+		return midiNote;
 	}
 
 	public float lastHz() {

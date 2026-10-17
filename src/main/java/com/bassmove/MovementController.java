@@ -24,13 +24,13 @@ public final class MovementController {
 	}
 
 	/** Call once per client tick, before the player ticks. */
-	public void tick(Minecraft mc, boolean active, int pitchClass) {
+	public void tick(Minecraft mc, boolean active, int midiNote) {
 		if (!active || mc.player == null || mc.gui.screen() != null) {
 			releaseAll();
 			return;
 		}
 
-		MovementAction action = pitchClass < 0 ? MovementAction.NONE : config.actions[pitchClass];
+		MovementAction action = midiNote < 0 ? MovementAction.NONE : config.actionFor(midiNote);
 
 		Set<KeyMapping> wanted = new HashSet<>(keysFor(action, mc.options));
 		for (KeyMapping key : new HashSet<>(held)) {

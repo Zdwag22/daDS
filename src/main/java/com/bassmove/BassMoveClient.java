@@ -27,7 +27,7 @@ public class BassMoveClient implements ClientModInitializer {
 	private volatile BassAnalyzer analyzer;
 	private volatile boolean enabled = false;
 	private boolean starting = false;
-	private int lastLoggedPitchClass = -2;
+	private int lastLoggedNote = -2;
 	private int debugTicks = 0;
 
 	@Override
@@ -60,15 +60,15 @@ public class BassMoveClient implements ClientModInitializer {
 			return;
 		}
 		BassAnalyzer current = analyzer;
-		int pitchClass = (enabled && current != null) ? current.pitchClass() : -1;
-		controller.tick(client, enabled, pitchClass);
+		int note = (enabled && current != null) ? current.midiNote() : -1;
+		controller.tick(client, enabled, note);
 
 		if (enabled && current != null && config.debug) {
-			if (pitchClass != lastLoggedPitchClass) {
-				lastLoggedPitchClass = pitchClass;
-				LOGGER.info("Note {} ({} Hz) -> {}", NoteTracker.nameOf(pitchClass),
+			if (note != lastLoggedNote) {
+				lastLoggedNote = note;
+				LOGGER.info("Note {} ({} Hz) -> {}", NoteTracker.nameOf(note),
 						Math.round(current.lastHz() * 10f) / 10f,
-						pitchClass < 0 ? MovementAction.NONE : config.actions[pitchClass]);
+						note < 0 ? MovementAction.NONE : config.actionFor(note));
 			}
 			if (++debugTicks >= 40) {
 				debugTicks = 0;
@@ -104,7 +104,7 @@ public class BassMoveClient implements ClientModInitializer {
 				mic = capture;
 				capture.start(newAnalyzer::accept);
 				enabled = true;
-				lastLoggedPitchClass = -2;
+				lastLoggedNote = -2;
 				tell(client, "Bass control on - play a note. Press the key again to stop.");
 			});
 		}, "BassMove-Open");

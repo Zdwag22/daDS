@@ -3,22 +3,20 @@
 Plug in a bass (or play near a mic), press **B** in game, and the notes you play become movement.
 Client-side only, works in singleplayer and on servers (it just presses your movement keys).
 
-## Default note map
+## Controls (4-string bass, standard tuning E A D G)
 
-Any octave of a note triggers its action, so open strings and their octaves behave the same.
+| String | Open: **move** | 1st fret: **look** | 2nd fret: **act** |
+|--------|----------------|--------------------|--------------------|
+| E | walk forward | look up | jump |
+| A | strafe left  | turn left | break blocks (hold) |
+| D | walk back    | look down | jump forward |
+| G | strafe right | turn right | place / use |
 
-| Note | Action | Note | Action |
-|------|--------|------|--------|
-| C  | strafe left     | F# | look up    |
-| C# | turn left       | G  | strafe right |
-| D  | walk back       | G# | turn right |
-| D# | sneak           | A  | sprint forward |
-| E  | walk forward    | A# | look down  |
-| F  | jump            | B  | nothing    |
-
-On a 4-string bass the open strings are E (forward), A (sprint), D (back) and G (strafe right).
-Change anything in `config/bassmove.properties` (created on first launch). Extra actions available:
-`JUMP_FORWARD`, `ATTACK`, `USE`, `NONE`.
+Notes are matched exactly (octave included: E1, F1, F#1, A1 ...), so the same note played higher up the neck
+does nothing. That keeps the controls to the first three frets of each string and stops stray notes moving you.
+Change anything in `config/bassmove.properties` (created on first launch), for example `note.E1=SPRINT_FORWARD`.
+Actions: `FORWARD, BACK, LEFT, RIGHT, JUMP, JUMP_FORWARD, SNEAK, SPRINT_FORWARD, TURN_LEFT, TURN_RIGHT,
+LOOK_UP, LOOK_DOWN, ATTACK, USE, NONE`. If you had an older config file, delete it so it regenerates.
 
 ## Building
 
